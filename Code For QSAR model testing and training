@@ -1,0 +1,351 @@
+import numpy           #importing numpy and pandas 
+import pandas as pd
+#pip install -U scikit-learn
+
+pip install -U scikit-learn    #installing scikit for machine learning 
+
+fp = "maccs"         #criterias for SVM model 
+model = "SVM"
+prop_train = 0.5
+cv_folds = 10
+trials = 10
+
+nfeat = 166      #maccs has 166 bits
+
+act = pd.read_csv("/Users/stevejoan/Desktop/MACCS_ACTIVE.csv", sep = ",")         #reading prossessed local files
+inact = pd.read_csv("/Users/stevejoan/Desktop/MACCS_INACTIVE.csv", sep = ",")     #Cleaning, RDkit, and file splitting done in KNIME
+
+act    #viewing file
+
+inact
+
+type(act)    #identtifying type of data
+
+cid_active = act['Molecule ChEMBL ID'].tolist()        #storing cids in lists and lablels in array
+labels_active = act['BioactivityClass'].to_numpy()
+cid_inactive = inact['Molecule ChEMBL ID'].tolist()
+labels_inactive = inact['BioactivityClass'].to_numpy()
+
+cid_active   #checking
+
+labels_active
+
+data_active= act.drop(['Molecule ChEMBL ID', 'BioactivityClass', 'bitvector0'], axis=1)   #removing mentioned columns
+
+data_inactive= inact.drop(['Molecule ChEMBL ID', 'BioactivityClass', 'bitvector0'], axis=1)
+
+data_active     #checking modified data which only has bitvectors
+
+data_inactive
+
+data_active=data_active.to_numpy()         #putting bit vectors in arrays
+data_inactive=data_inactive.to_numpy()
+
+data_active
+
+trial = 0       #specifying parameter
+
+from sklearn.model_selection import train_test_split    #importing spliting module
+X1_train, X1_test, y1_train, y1_test = train_test_split(data_active, labels_active, test_size = 0.5, random_state = trial)
+X2_train, X2_test, y2_train, y2_test = train_test_split(data_inactive, labels_inactive, test_size = 0.5, random_state = trial)
+X_train = numpy.concatenate((X1_train, X2_train), axis=0)       #splitting active and inactive molecules in half
+X_test = numpy.concatenate((X1_test, X2_test), axis=0)          #combining one half of active and one half of inactive for training the model
+y_train = numpy.concatenate((y1_train, y2_train), axis=0)       #using other two halfs for testing the model
+y_test = numpy.concatenate((y1_test, y2_test), axis=0)
+
+X_train
+
+X_train.shape    #getting dimensions of the array
+
+X_test.shape
+
+from sklearn import svm
+my_kernel = 'linear'        #for finding hyperplane
+X_train = numpy.array(X_train, dtype = 'float')   #creating array with float datatype
+
+classification = svm.SVC(C=0.01, kernel = my_kernel, probability = True, class_weight= 'balanced')  #c=0.01 for better smoothening, prob=true
+model_class = classification.fit(X_train, y_train)     # for class probabilities, balanced for adjusting weights. Finally fitting model 
+
+y_pred = model_class.predict(X_test)   #running prediction
+
+from sklearn.metrics import roc_auc_score    #importing roc-auc module
+AUC = roc_auc_score(y_test, y_pred)          #getting roc-auc from data and presictions
+print("AUC: %f" %  AUC)
+
+from sklearn.metrics import matthews_corrcoef   #same thing for mcc aswell
+MCC = matthews_corrcoef(y_test, y_pred)
+print("MCC: %f" %  MCC)
+
+def predict_svm_distances(model, X_test, y_test, scaler = False): #calculates the signed distances from the decision boundary for each
+    X_test = numpy.array(X_test, dtype = 'float')                 #test point, and returns these values
+    distances = model.decision_function(X_test) #positive -> active
+    return(distances)
+
+y_svm_distances = predict_svm_distances(model_class, X_test, y_test, scaler = False)   #calling function
+
+y_svm_distances
+
+import matplotlib.pyplot as plt             #plotting using matplot
+from sklearn.metrics import roc_curve
+
+def plot_roc_curve(true_y, y_prob):     
+    """
+    plots the roc curve based of the probabilities
+    """
+
+    fpr, tpr, thresholds = roc_curve(true_y, y_prob)     
+    plt.plot(fpr, tpr)                                   #plotting false positive rate and true positive rate
+    plt.xlabel('False Positive Rate')                    #x-axis false positive and y-axis true positives 
+    plt.ylabel('True Positive Rate')
+
+plot_roc_curve(y_test, y_svm_distances)
+
+from sklearn.ensemble import RandomForestClassifier       #importing RandomForest module from sklearn
+X_train = numpy.array(X_train, dtype = 'float')           #creating training array with float datatype
+ntrees = 100                                              #100 total trees
+classification = RandomForestClassifier(n_estimators = ntrees, class_weight= 'balanced') #100 descision trees, balanced for weight adjustment
+model_class = classification.fit(X_train, y_train)        #fitting model with data
+
+y_pred = model_class.predict(X_test)  #running prediction
+
+from sklearn.metrics import roc_auc_score     #similar to before with svm
+AUC = roc_auc_score(y_test, y_pred)
+print("AUC: %f" %  AUC)
+
+from sklearn.metrics import matthews_corrcoef
+MCC = matthews_corrcoef(y_test, y_pred)
+print("MCC: %f" %  MCC)
+
+def predict_rf_prob(model, X_test, y_test, scaler = False):     #returns the probability that each test instance belongs to the positive
+    X_test = numpy.array(X_test, dtype = 'float')               #class (label = 1)
+    probabilities = model.predict_proba(X_test)[:,1]
+    return(probabilities)
+
+y_rf_prob = predict_rf_prob(model_class, X_test, y_test, scaler = False)  #calling function
+
+plot_roc_curve(y_test, y_rf_prob)    #using before mentioned function to plot graph
+
+pip install xgboost    #installing xgboost
+
+from xgboost import XGBClassifier             #importing XGBClassifier 
+from sklearn.metrics import roc_auc_score, matthews_corrcoef    #importing AUC and MCC modules
+
+X_train = numpy.array(X_train, dtype='float')   #creating test and train arrays of float datatype
+X_test = numpy.array(X_test, dtype='float')
+
+xgb_model = XGBClassifier(
+    objective='binary:logistic',   #for binary classification
+    eval_metric='logloss',         #measures how far predicted probabilities are from the actual labels
+    n_estimators=100,              #100 rounds
+    learning_rate=0.1,             #controls the contribution of each tree to the final model
+    max_depth=5,                   #the maximum depth of each tree
+    subsample=0.8,                 #training samples used per tree
+    colsample_bytree=0.8,          #fraction of features randomly chosen for each tree
+    random_state=42                #sets the random seed to ensure reproducibility
+)
+
+xgb_model.fit(X_train, y_train,         #fiting the model
+          eval_set=[(X_test, y_test)],
+          verbose=True)
+
+y_pred = xgb_model.predict(X_test)     #running predicition
+
+y_pred_proba = xgb_model.predict_proba(X_test)[:, 1]     #getting predicition probabilty
+
+AUC = roc_auc_score(y_test, y_pred_proba)     #similar to the two previous models, getting AUC and MCC
+print(f"AUC: {AUC:.6f}")
+
+# Calculate MCC
+MCC = matthews_corrcoef(y_test, y_pred)
+print(f"MCC: {MCC:.6f}")
+
+def predict_xgb_distances(model, X_test):             #this function takes test data and a trained XGBoost model, 
+    X_test = numpy.array(X_test, dtype='float')       #and returns the predicted probabilities for class 1
+    distances = model.predict_proba(X_test)[:, 1]  
+    return distances
+
+y_xgb_distances = predict_xgb_distances(xgb_model, X_test)   #calling function
+
+y_xgb_distances       #checking distances/probabilties
+
+plot_roc_curve(y_test, y_xgb_distances)    #plotting 
+
+fp1 = "morgan"      ##criterias for SVM model this time for morgan
+model1 = "SVM"
+prop_train1 = 0.5
+cv_folds1 = 10
+trials1 = 10
+
+nfeat1 = 1024   #morgan fingerprint has 1024 bits
+
+act1 = pd.read_csv("/Users/stevejoan/Desktop/MORGAN_ACTIVE.csv", sep = ",")       #reading prossessed local files
+inact1 = pd.read_csv("/Users/stevejoan/Desktop/MORGAN_INACTIVE.csv", sep = ",")   #Cleaning, RDkit, and file splitting done in KNIME
+
+act1   #viewing file
+
+inact1
+
+type(act1)    #identifying type of data
+
+cid_active1 = act1['Molecule ChEMBL ID'].tolist()         #storing cids in lists and lablels in array
+labels_active1 = act1['BioactivityClass'].to_numpy()
+cid_inactive1 = inact1['Molecule ChEMBL ID'].tolist()
+labels_inactive1 = inact1['BioactivityClass'].to_numpy()
+
+cid_active1         #checking
+
+labels_active1
+
+data_active1= act1.drop(['Molecule ChEMBL ID', 'BioactivityClass'], axis=1)   #removing mentioned columns
+
+data_inactive1= inact1.drop(['Molecule ChEMBL ID', 'BioactivityClass'], axis=1)
+
+data_active1   #checking modified data which only has bitvectors
+
+data_inactive1
+
+data_active1=data_active1.to_numpy()       #putting bit vectors in arrays
+data_inactive1=data_inactive1.to_numpy()
+
+data_active1
+
+trial1 = 0    #specifying parameter
+
+from sklearn.model_selection import train_test_split            #importing spliting module
+X1_train1, X1_test1, y1_train1, y1_test1 = train_test_split(data_active1, labels_active1, test_size = 0.5, random_state = trial1)
+X2_train1, X2_test1, y2_train1, y2_test1 = train_test_split(data_inactive1, labels_inactive1, test_size = 0.5, random_state = trial1)
+X_train1 = numpy.concatenate((X1_train1, X2_train1), axis=0)    #splitting active and inactive molecules in half
+X_test1 = numpy.concatenate((X1_test1, X2_test1), axis=0)       #combining one half of active and one half of inactive for training the model
+y_train1 = numpy.concatenate((y1_train1, y2_train1), axis=0)    #using other two halfs for testing the model
+y_test1 = numpy.concatenate((y1_test1, y2_test1), axis=0)
+
+X_train1
+
+X_train1.shape     #getting dimensions of the array
+
+X_test1.shape
+
+from sklearn import svm
+my_kernel1 = 'linear'         #using same model and parameters used for maccs fingerprint
+X_train1 = numpy.array(X_train1, dtype = 'float')     
+
+classification1 = svm.SVC(C=0.01, kernel = my_kernel1, probability = True, class_weight= 'balanced')
+model_class1 = classification1.fit(X_train1, y_train1)
+
+y_pred1 = model_class1.predict(X_test1)   #prediction
+
+from sklearn.metrics import roc_auc_score    #getting auc and mcc
+AUC1 = roc_auc_score(y_test1, y_pred1)
+print("AUC: %f" %  AUC1)
+
+from sklearn.metrics import matthews_corrcoef
+MCC1 = matthews_corrcoef(y_test1, y_pred1)
+print("MCC: %f" %  MCC1)
+
+def predict_svm_distances(model1, X_test1, y_test1, scaler = False):    #same as before
+    X_test1 = numpy.array(X_test1, dtype = 'float')
+    distances1 = model1.decision_function(X_test1) #positive -> active
+    return(distances1)
+
+y_svm_distances1 = predict_svm_distances(model_class1, X_test1, y_test1, scaler = False)
+
+y_svm_distances1
+
+import matplotlib.pyplot as plt        
+from sklearn.metrics import roc_curve
+
+def plot_roc_curve(true_y1, y_prob1):
+    """
+    plots the roc curve based of the probabilities
+    """
+
+    fpr1, tpr1, thresholds1 = roc_curve(true_y1, y_prob1)
+    plt.plot(fpr1, tpr1)
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+
+plot_roc_curve(y_test1, y_svm_distances1)      #svm plot for morgan
+
+from sklearn.ensemble import RandomForestClassifier     #same model and parameters used as maccs fingerprint
+X_train1 = numpy.array(X_train1, dtype = 'float')
+ntrees1 = 100
+classification1 = RandomForestClassifier(n_estimators = ntrees1, class_weight= 'balanced')
+model_class1 = classification1.fit(X_train1, y_train1)
+
+y_pred1 = model_class1.predict(X_test1)
+
+from sklearn.metrics import roc_auc_score
+AUC1 = roc_auc_score(y_test1, y_pred1)
+print("AUC: %f" %  AUC1)
+
+from sklearn.metrics import matthews_corrcoef
+MCC1 = matthews_corrcoef(y_test1, y_pred1)
+print("MCC: %f" %  MCC1)
+
+def predict_rf_prob(model1, X_test1, y_test1, scaler = False):
+    X_test1 = numpy.array(X_test1, dtype = 'float')
+    probabilities1 = model1.predict_proba(X_test1)[:,1]
+    return(probabilities1)
+
+y_rf_prob1 = predict_rf_prob(model_class1, X_test1, y_test1, scaler = False)
+
+plot_roc_curve(y_test1, y_rf_prob1)      #rf plot for morgan
+
+from xgboost import XGBClassifier              #importing xgboost
+from sklearn.metrics import roc_auc_score, matthews_corrcoef
+
+X_train1 = numpy.array(X_train1, dtype='float')
+X_test1 = numpy.array(X_test1, dtype='float')
+
+xgb_model1 = XGBClassifier(              #same model and parameter used in maccs fingerprints
+    objective='binary:logistic',
+    eval_metric='logloss',
+    n_estimators=100,
+    learning_rate=0.1,
+    max_depth=5,
+    subsample=0.8,
+    colsample_bytree=0.8,
+    random_state=42
+)
+
+xgb_model1.fit(X_train1, y_train1,
+          eval_set=[(X_test1, y_test1)],
+          verbose=True)
+
+y_pred1 = xgb_model1.predict(X_test1)
+
+y_pred_proba1 = xgb_model1.predict_proba(X_test1)[:, 1]
+
+AUC1 = roc_auc_score(y_test1, y_pred_proba1)
+print(f"AUC: {AUC1:.6f}")
+
+# Calculate MCC
+MCC1 = matthews_corrcoef(y_test1, y_pred1)
+print(f"MCC: {MCC1:.6f}")
+
+def predict_xgb_distances(model1, X_test1):
+    X_test1 = numpy.array(X_test1, dtype='float')
+    distances1 = model1.predict_proba(X_test1)[:, 1]  
+    return distances1
+
+y_xgb_distances1 = predict_xgb_distances(xgb_model1, X_test1)
+
+y_xgb_distances1
+
+plot_roc_curve(y_test1, y_xgb_distances1)      #xgboost plot of morgan fingerprint 
+
+Results = {
+    "Model": ["SVM", "RandomForest", "XGBoost", "SVM", "RandomForest", "XGBoost"],
+    "Fingerprint": ["MACCS", "MACCS", "MACCS", "Morgan", "Morgan", "Morgan"],
+    "ROC-AUC": [0.647125,0.653414,0.809075,0.790094,0.659704,0.904762]
+}
+
+df = pd.DataFrame(Results)
+print(df)
+
+#Overall the Morgan Fingerprints performed better than the MACCS Fingerprints according to the AUC value.
+#A higher ROC-AUC value is typically favored and indicates a better model, where ROC-AUC value of 1 means a perfect model.
+
+#Potential sources of bias and noise in Chembl data could be data coming from different varied sources, missananotations, duplicate records,
+#personal bias in publications, varrying standard units and relations, missing/invalid feilds, certain values not passing basic thresholds
+#and generally older outdated data.

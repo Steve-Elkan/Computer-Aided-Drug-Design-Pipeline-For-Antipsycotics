@@ -1,0 +1,23 @@
+Preliminary research about working and function of antipsychotics 
+|
+Identify target and use ChEMBL to get actives (IC50)
+|
+Clean dataset and calculate pIC50 values using KNIME
+|
+Using RDkit to get 2D and 3D descriptors for ligands
+|
+Build QSAR models using SVM, Random Forests and XGBoost 
+|
+Test models with R2, RMSE and Cross Validation 
+|
+Using best model to predict top 10 leads
+|
+Get coordinates of active site of protein using P2RANK (PrankWeb) 
+|
+Perform docking using Swiss dock (AutoDock Vina)
+|
+View docked complexes using ChimeraX
+|
+Get top 3 best leads based of binding affinity 
+|
+Use SwissADME to analyse the leads

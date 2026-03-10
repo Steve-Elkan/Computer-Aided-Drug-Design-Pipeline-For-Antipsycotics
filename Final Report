@@ -1,0 +1,32 @@
+Overall Report
+This project started with an initial literature review about Schizophrenia and associated psychotic conditions. Along with research about existing Antipsychotics in the market and then types.
+Then the target protein 5-HT2A was identified. From above research.
+ChEMBL was used to identify known Bioactive ligands for the target based on IC50.
+The acquired dataset was cleaned and processed using a previously used KNIME pathway.
+2D and 3D descriptors were found for the molecules using RDKit.
+Then 3 QSAR models where build using SVM, RandomForests and XGBoost.
+Certain criteria were used to test the models and it was identified that XGBooost was the best model.
+Then this XGBoost model was used to identify the the top 10 best ligands.
+For docking P2RANK was used to identify one of the best binding site on the target protein.
+Molecular Docking was done using SwissDock (AutoDock Vina) on the particular binding site.  
+ChimeraX was used to visualise the docked complexes and there specific binding affinities were noted.
+Top 3 best leads (4 if including already existing drug) were considered based on bonding affinity.
+Finally SwissADME was used to analyse the results.
+
+
+
+SwissADME Conclusion
+Here is the full analysis of the top leads. We will consider the 1st, 3rd and 4th molecules as potential drugs since 2 already exists. Now we can check for a few things here Pharmacokinetics. All the 3 models the have high GI absorption. Along with an even number of “yes” for all other criteria with. Molecule 1 seems to have the highest skin permeability (logKp)
+
+All the ligands obey the Lipinski Rule with 0 violations. All molecules have a Bioavailability score of  0.55 which is considered optimal for good oral absorption.
+
+For Medicinal Chemistry all molecules do not flag PAINS and Brenk. But non of them satisfy leadlikeliness as all of the molecules have MW>350 and XLOGP3>3.5. Molecule 4 has the best Synthetic accessibility of 2.78 (lower the better I.e easier to create) with molecules 1 and 3 having slightly higher values.
+
+Over all I think molecules 1 and 4 could prove as potential Antipsychotic Drugs with the proper optimisation and wet lab study, there is also literature available on these ligands that proves the same.   
+
+The ChEMBL Ids for the best ligands are:
+Molecule 1 - CHEMBL5618291 
+Cl.c1ccc2c(c1)nnn2CCCCN1CCN(c2nsc3ccccc23)CC1
+
+Molecule 4 - CHEMBL602874
+COc1ccc(NC(=O)Nc2cccc(Cl)c2)cc1-c1c(Br)cnn1C
